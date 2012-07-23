@@ -32,6 +32,7 @@ class Isis2709Extract implements ArrayAccess, Countable,  Iterator {
     
     /** Iterator */
     private $it_pos;
+    private $it_fake_pos;
         
     /**
      * @param string $data Iso 2709 Se asume que es un Iso de Isis valido
@@ -49,6 +50,7 @@ class Isis2709Extract implements ArrayAccess, Countable,  Iterator {
         $this->fields = array_keys($this->array);
         
         $this->it_pos = 0;
+        $this->it_fake_pos = $this->fields[$this->it_pos];
     }
     
     private function __free ()
@@ -138,7 +140,7 @@ class Isis2709Extract implements ArrayAccess, Countable,  Iterator {
      */
     public function count() 
      {
-        count($this->array);
+        return count($this->array);
      }
      
     /**
@@ -146,23 +148,27 @@ class Isis2709Extract implements ArrayAccess, Countable,  Iterator {
       */
      function rewind() {
         $this->it_pos = 0;
+        $this->it_fake_pos = $this->fields[$this->it_pos];
     }
 
     function current() {       
-        return $this[$this->fields[$this->it_pos]];
+        return $this[$this->it_fake_pos];
     }
 
     function key() {        
-        return $this->it_pos;
+        return $this->it_fake_pos;
     }
 
     function next() {   
-        if ( $this->it_pos < count($this) )
+        if ( $this->it_pos < count($this)-1 )
+        {
             ++$this->it_pos;
+            $this->it_fake_pos = $this->fields[$this->it_pos];
+        }
     }
 
     function valid() {      
-        return ( $this->key() < count($this) );
+        return ( $this->it_pos < count($this)-1 );
     }
     
     /**
