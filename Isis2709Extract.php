@@ -39,8 +39,8 @@ class Isis2709Extract implements ArrayAccess, Countable,  Iterator {
      */
     public function __construct ( $data, $block80 = true) {        
 
-        if ( $block80) $this->data = implode("", explode("\r\n", $data));
-                  else $this->data = $data;
+        if ( $block80) $this->data = trim(implode("", explode("\r\n", $data)));
+                  else $this->data = trim($data);
                   
         $this->loadHeader();   
         $this->loadDirectory();
