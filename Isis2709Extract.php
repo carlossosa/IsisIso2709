@@ -9,7 +9,6 @@
  *          terms of the GNU General Public License as published by the Free Software
  *          Foundation; either version 2 of the License, or (at your option) any later
  *          version.
- * @todo Arreglar la conversion de caracteres.
  */
 class Isis2709Extract implements ArrayAccess, Countable,  Iterator {
     // Head Const
@@ -39,19 +38,25 @@ class Isis2709Extract implements ArrayAccess, Countable,  Iterator {
      * @param boolean $block80 Dividido en lineas de 80 caracteres, por defecto Isis lo exporta asi.
      */
     public function __construct ( $data, $block80 = true) {        
-        $data = utf8_decode($data);
+
         if ( $block80) $this->data = implode("", explode("\r\n", $data));
                   else $this->data = $data;
                   
         $this->loadHeader();   
         $this->loadDirectory();
         $this->fieldsExtract();
-        
+        $this->__free();
         $this->fields = array_keys($this->array);
         
         $this->it_pos = 0;
     }
-        
+    
+    private function __free ()
+    {
+        unset($this->data, $this->head, $this->directory);
+    }
+
+
     /**
      * Analisis del Iso2709
      */
@@ -116,14 +121,14 @@ class Isis2709Extract implements ArrayAccess, Countable,  Iterator {
             $subfield = array();
             $_sfs = explode("^", $f);
             foreach ( $_sfs as $k=>$v) {
-                if ( $k != 0 ) $subfield[substr($v,0,1)] = substr($v, 1);
+                if ( $k != 0 ) $subfield[substr($v,0,1)] = $this->IsisDecode( substr($v, 1));
                 else {
                     $subfield['i1'] = substr($v,0,1);
                     $subfield['i2'] = substr($v,1,1);
                 }
             }
             return $subfield;
-        } else return $f;
+        } else return $this->IsisDecode ($f);
     }
     
     /** IMPLEMENTS */
@@ -180,5 +185,43 @@ class Isis2709Extract implements ArrayAccess, Countable,  Iterator {
             return $this->array[$offset];
         else 
             throw new ErrorException('Campo no válido.');
+    }
+    
+    private function IsisDecode ( $var)
+    {
+        $new = NULL;
+        for ( $i=0; $i<strlen( $var); $i++)
+                $new .= ( $this->__decode_letter($var[$i]));        
+        return $new;
+    }
+
+    private function __decode_letter( $l)
+    {
+        switch (ord($l)) {                                                         
+            //A
+            case 131: return 'â'; case 132: return 'ä'; case 142: return 'Ä';
+            case 160: return 'á'; case 181: return 'Á'; case 182: return 'Â';
+            case 183: return 'À';                
+            //E
+            case 130: return 'é'; case 136: return 'ê'; case 137: return 'ë';
+            case 138: return 'è'; case 144: return 'É'; case 212: return 'È';                
+            //I
+            case 139: return 'ï'; case 140: return 'î'; case 141: return 'ì';
+            case 161: return 'í'; case 214: return 'Í'; case 215: return 'Î';
+            case 216: return 'Ï';            
+            //O    
+            case 147: return 'ô'; case 148: return 'ö'; case 149: return 'ò';                        
+            case 224: return 'Ó'; case 226: return 'Ô'; case 227: return 'Ò'; 
+            case 162: return 'ó';                
+            //U
+            case 150: return 'û'; case 151: return 'ù'; case 152: return 'ù';                
+            case 154: return 'Ü'; case 233: return 'Ú'; case 234: return 'Û';    
+            case 235: return 'Ù'; case 163: return 'ú'; case 129: return 'ü';                
+            //RESTO    
+            case 128: return 'Ç'; case 135: return 'ç'; case 164: return 'ñ';
+            case 165: return 'Ñ'; case 169: return '®';
+            //Def    
+            default: return $l;
+        }
     }
 }
