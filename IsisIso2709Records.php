@@ -1,33 +1,67 @@
 <?php
 /**
  * Class IsisIso2709Records se encarga de ir rastreando los registros en un archivo ISO exportado
- * por CDS/Isis.
+ * por CDS/Isis. Dando la posibilidad de acceder a los mismo como si de un Array se tratase.
  *
  * @author Carlos Sosa 
+ * @license IsisIso2709Records is free software; you can redistribute it and/or modify it under the
+ *          terms of the GNU General Public License as published by the Free Software
+ *          Foundation; either version 2 of the License, or (at your option) any later
+ *          version.
+ * @package IsisIso2709
  */
 class IsisIso2709Records implements ArrayAccess, Countable,  Iterator {
+    /**
+     * RECORD_SEPARATOR : separador de registros en CDS/Isis 
+     */
     const RECORD_SEPARATOR = '##';
+    /**
+     * @ignore 
+     */
     const RECORD_FIELD_SEPARATOR = '#';
     
+    /**
+     * Recurso con el Fichero abierto.
+     * @var Resource 
+     */
     private $resource;
+    /**
+     * Micro indice con las ubicaciones de los Registros en el Iso
+     * @var type 
+     */
     private $directory;
     
+    /**
+     * Iterartor contador
+     * @var type 
+     */
     private $it_pos;
     
+    /**
+     * 
+     * @param string $_path URI al archivo ISO
+     * @throws ErrorException Al ocurrir un error al intentar abrir el fichero.
+     */
     public function __construct( $_path) {
-        if ( file_exists($_path) || is_readable($_path))
+        if ( file_exists($_path) || is_readable($_path)) //Check de accesibilidad al archivo.
         {
-          $this->resource = fopen($_path, 'r');
+          $this->resource = fopen($_path, 'r'); // Abro el archivo
+          if ( !is_resource($this->resource))
+              throw new ErrorException('Error al abrir el archivo.');
         } else            
-            throw new ErrorException('Error al intentar acceder al archivo.');        
+            throw new ErrorException('Error al intentar acceder al archivo.'); // Lanzada un Excepcion de acceso
         
+        // Incializo el Indice
         $this->directory = array();
         $this->preScan();   
                         
-        fseek($this->resource, 0);
+        // Iterator        
         $this->it_pos = 0;
     }
 
+    /**
+     * Crea el indice con las ubicaciones de los registros en el Iso 
+     */
     private function preScan ()
     {
         $pos = 0;
@@ -50,6 +84,7 @@ class IsisIso2709Records implements ArrayAccess, Countable,  Iterator {
         }
         
         if ( !isset($this->directory[$pos][1]) ) unset($this->directory[$pos]);        
+        fseek($this->resource, 0);
     }
     
     /** IMPLEMENTS */
@@ -108,10 +143,10 @@ class IsisIso2709Records implements ArrayAccess, Countable,  Iterator {
         {
             if ( ($offset-1) == $this->it_pos )
             {
-                return new Isis2709Extract(stream_get_line($this->resource, $this->directory[$this->it_pos][1]));
+                return new IsisIso2709RecordExtract(stream_get_line($this->resource, $this->directory[$this->it_pos][1]));
             } else {
                 fseek($this->resource, $this->directory[$this->it_pos][0]);
-                return new Isis2709Extract(stream_get_line($this->resource, $this->directory[$this->it_pos][1]));
+                return new IsisIso2709RecordExtract(stream_get_line($this->resource, $this->directory[$this->it_pos][1]));
             }
         }
         else 
