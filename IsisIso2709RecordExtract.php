@@ -176,7 +176,7 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
             case 235: return 'Ù'; case 163: return 'ú'; case 129: return 'ü';                
             //RESTO    
             case 128: return 'Ç'; case 135: return 'ç'; case 164: return 'ñ';
-            case 165: return 'Ñ'; case 169: return '®';
+            case 165: return 'Ñ'; case 169: return '®'; case 194: return '¿';
             //Def    
             default: return $l;
         }
