@@ -3,6 +3,8 @@
  * Clase para extracción de los datos de un Iso2709 exportado por ISIS en un Array.
  * 
  * Esta clase es un extracto simplificado de la herramienta creada por Serhij Dubyk <serhijdubyk at gmail at com).
+ * Proporcionando solo la capacidad de leer el contenido de un ISO2709 exportado por ISIS en PHP y la posibilidad de conversión a casi cualquier
+ * formato conocido.
  *
  * @author Carlos Sosa <carlitin at gmail dot com>
  * @license IsisIso2709RecordExtract is free software; you can redistribute it and/or modify it under the
@@ -12,17 +14,26 @@
  * @package IsisIso2709
  */
 class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
-    // Head Const
+    /** Head Const */
     const Record_Length = 0;
     const Subfield_Identifier_Length = 1;
     const Base_Address = 2;
     const Directory_1map = 3;
     const Directory_2map = 4;
     
-    // Directory Const
+    /** Directory Const */
     const DIRECTORY_FIELD_LABEL = 0;
     const DIRECTORY_FIELD_LENGTH = 1;
     const DIRECTORY_FIELD_ADDRESS = 2;
+    
+    /** ISIS CHARS */
+    const ISIS_SUBFIELD_DELIMITER = '^';
+    const ISIS_REPETIBLE = '%';
+    const ISIS_FIELD_DELIMITER = '#';
+    
+    /** PROPIOS */
+    const RECORDEXTRACT_SUBFIELD_IND1 = 'i1';
+    const RECORDEXTRACT_SUBFIELD_IND2 = 'i2';
 
     /** DATA */
     private $data;
@@ -47,68 +58,143 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
         $this->loadHeader();   
         $this->loadDirectory();
         $this->fieldsExtract();
-        $this->__free();
-        $this->fields = array_keys($this->array);
+        $this->free();
+        $this->loadKeys();
         
         $this->it_pos = 0;
         $this->it_fake_pos = $this->fields[$this->it_pos];
     }
     
-    private function __free ()
+    private function loadKeys ()
+    {
+        $this->fields = array_keys($this->array);
+    }
+    
+    /**
+     * Libera de memoria el RAW recibido en el constructor,
+     * solo se mantiene en memoria el Array con los datos Parseados. 
+     */
+    private function free ()
     {
         unset($this->data, $this->head, $this->directory);
     }
 
 
     /**
-     * Analisis del Iso2709
+     * Analisis de la cabacera del ISO 2709
      */
     private function loadHeader ()
     {
+        // Agarro los primeros 24 Caracteres partenecientes a la cabacera
         $trozo = substr( $this->data, 0, 24);
-        $this->head = array();
-        $this->head[] = intval( substr( $trozo, 0, 5));
-        $this->head[self::Subfield_Identifier_Length] = ( intval(substr( $trozo, 11, 1)) == 0) ? 3 : ( intval(substr( $trozo, 11, 1)) == 0);
-        $this->head[self::Base_Address] = intval(substr( $trozo, 12, 5));
-        $this->head[self::Directory_1map] = intval( substr( $trozo, 20, 1));
-        $this->head[self::Directory_2map] = intval( substr( $trozo, 21, 1));
+        
+        $this->head = array (   self::Record_Length                 => intval( substr( $trozo, 0, 5)),
+                                self::Subfield_Identifier_Length    => ( intval(substr( $trozo, 11, 1)) == 0) ? //Buscar si ISIS coloco el tamano del identificador de registro
+                                                                                                                    3 //Generalmente no sucede pero en usamos 3 ya que en UNIMARC los registros son identificados por 3 digitos
+                                                                                                              : //Si tenemos la suerte que ISIS coloco el tamano pues usamos el que nos da.
+                                                                                                                    intval( substr( $trozo, 11, 1)),
+                                self::Base_Address                  => intval(substr( $trozo, 12, 5)), //Posición donde termina la cabecera de registro y empiezan los registros.
+                                self::Directory_1map                => intval( substr( $trozo, 20, 1)), 
+                                self::Directory_2map                => intval( substr( $trozo, 21, 1))
+                            );
+        unset($trozo);
     }
     
     /**
-     * Analisis del Directorio. 
+     * Analisis del Direcotorio del Iso2709 para la extracción de los 
+     * datos de lso Registros almacenados.
      */
     private function loadDirectory ()
     {
-        $trozo = substr( $this->data, 24, ($this->head[self::Base_Address]-25));
+        //Agarro el trozo correspondiente al Directorio de los Registros
+        $trozo = substr( $this->data, 24, ($this->head[self::Base_Address]-25));        
         $len = strlen($trozo);
-        $item_len = $this->head[self::Subfield_Identifier_Length] + $this->head[self::Directory_1map] + $this->head[self::Directory_2map];
+        //Tamano de cada elmento del Registro
+        $item_len = $this->head[self::Subfield_Identifier_Length] + 
+                    $this->head[            self::Directory_1map] + 
+                    $this->head[            self::Directory_2map];
+        //Cantidad de elementos
         $items_num = $len/$item_len;
-        $first_item = 0;        for ( $i=0; $i < $items_num; $i++)
-        {
-            $item = substr( $trozo, $i*$item_len, $item_len);
-            $this->directory[$i] = array ( self::DIRECTORY_FIELD_LABEL => substr($item, 0, $this->head[self::Subfield_Identifier_Length]),
-                                         self::DIRECTORY_FIELD_LENGTH => intval( substr($item, $this->head[self::Subfield_Identifier_Length], $this->head[self::Directory_1map])),   
-                                         self::DIRECTORY_FIELD_ADDRESS => substr($item, ($this->head[self::Directory_1map] + $this->head[self::Subfield_Identifier_Length]), $this->head[self::Directory_2map]) );
-            
-            if ( $i == 0){ $first_item = $this->directory[$i][self::DIRECTORY_FIELD_ADDRESS]; }
-            
-            $this->directory[$i][self::DIRECTORY_FIELD_ADDRESS] = $this->directory[$i][self::DIRECTORY_FIELD_ADDRESS] - $first_item;
-        }
+        
+        $first_item = 0;
+        for ( $i=0; $i < $items_num; $i++)
+            {
+                //Saco el elemento
+                $item = substr( $trozo, $i*$item_len, $item_len);
+                //Voy agregando los datos de cada registros al directorio        
+                $this->directory[$i] = array ( self::DIRECTORY_FIELD_LABEL => substr(                                           $item, 
+                                                                                                                                    0, 
+                                                                                        $this->head[self::Subfield_Identifier_Length])
+                                                ,
+                                              self::DIRECTORY_FIELD_LENGTH => intval( substr        ($item, 
+                                                                                                $this->head[self::Subfield_Identifier_Length], 
+                                                                                                           $this->head[self::Directory_1map]))
+                                                ,   
+                                              self::DIRECTORY_FIELD_ADDRESS => substr(                                             $item, 
+                                                                                                    ($this->head[self::Directory_1map] + 
+                                                                                            $this->head[self::Subfield_Identifier_Length]
+                                                                                                    ), 
+                                                                                                        $this->head[self::Directory_2map]) 
+                                                );
+
+                //Correccion de la posicion de cada registro
+                if ( $i == 0){ $first_item = $this->directory[$i][self::DIRECTORY_FIELD_ADDRESS]; }
+                $this->directory[$i][self::DIRECTORY_FIELD_ADDRESS] = $this->directory[$i][self::DIRECTORY_FIELD_ADDRESS] - $first_item;
+            }
+        //Libero recursos
+        unset( $trozo, 
+                $len, 
+                $item_len, 
+                $items_num, 
+                $first_item, 
+                $item);
     }
     
     /**
      * Extraccion de los campos.
      */
     private function fieldsExtract() {
-        $trozo = substr($this->data, $this->head[self::Base_Address]);
+        $trozo  = substr($this->data, $this->head[self::Base_Address]);
+        $_sF    = NULL;
         foreach ( $this->directory as $field)
         {
-            $this->array[$field[self::DIRECTORY_FIELD_LABEL]] = $this->__subFieldsExtract( rtrim( substr( $trozo, 
-                                                                                                    $field[self::DIRECTORY_FIELD_ADDRESS], 
-                                                                                                    $field[self::DIRECTORY_FIELD_LENGTH]
-                                                                                                   ), '#')
-                                                                                          );
+            //Detectar duplicidad de campos
+            if ( isset($this->array[$field[self::DIRECTORY_FIELD_LABEL]]))
+            {
+                unset($_sF);
+                //Saco el Array() de los Subfields
+                $_sF = $this->__subFieldsExtract( rtrim( substr( $trozo, 
+                                                            $field[self::DIRECTORY_FIELD_ADDRESS], 
+                                                            $field[self::DIRECTORY_FIELD_LENGTH]
+                                                        ), self::ISIS_FIELD_DELIMITER)
+                                                    );
+                
+                if ( is_array($_sF) && is_array( $this->array[$field[self::DIRECTORY_FIELD_LABEL]] ))
+                    //Los campos repetidos los agrego al Array() pricipal separando el campo agregado por % que en ISIS se emple como separado de campo repetibles
+                    foreach ( $_sF as $_R => $_V) 
+                        //Recorro los subcampos
+                        if ( !in_array( $_R, array( self::RECORDEXTRACT_SUBFIELD_IND1, self::RECORDEXTRACT_SUBFIELD_IND2) ) ) //Los identificadores de registros no son repetibles asi que se omiten
+                                //Si el subcampo no exite solo lo asigno
+                                if ( !isset($this->array[$field[self::DIRECTORY_FIELD_LABEL]][$_R]) ) 
+                                    $this->array[$field[self::DIRECTORY_FIELD_LABEL]][$_R] = $_V;
+                                else 
+                                    //Caso contrario le agrego el contenido del subcampo secundario
+                                    $this->array[$field[self::DIRECTORY_FIELD_LABEL]][$_R] .= self::ISIS_REPETIBLE . $_V;
+                else
+                    //Pudiera ocurrir el extrano caso de que el secundario si tuviera subcampo aunque el primero no, 
+                    //algo realmente raro pero caso que ocurriera me quedo solo con el campo primario
+                    if ( !is_array($_sF) && !is_array( $this->array[$field[self::DIRECTORY_FIELD_LABEL]] ))
+                        $this->array[$field[self::DIRECTORY_FIELD_LABEL]] .= self::ISIS_REPETIBLE . $_sF;                    
+            } else {            
+                $this->array[$field[self::DIRECTORY_FIELD_LABEL]] = $this->__subFieldsExtract( rtrim( substr( $trozo, 
+                                                                                                        $field[self::DIRECTORY_FIELD_ADDRESS], 
+                                                                                                        $field[self::DIRECTORY_FIELD_LENGTH]
+                                                                                                    ), self::ISIS_FIELD_DELIMITER)
+                                                                                              );
+            }
         }
+        unset($trozo,
+                $_sF);
     }
     
     /**
@@ -119,19 +205,20 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
      */
     private function __subFieldsExtract ( $f)
     {                
+        //Detectar si es un subcampo buscando 
         if ( preg_match( '/(^(\s|\d|\*)+\^|^\^)/', $f) )
         {    
             $subfield = array();
-            $_sfs = explode("^", $f);
+            $_sfs = explode(self::ISIS_SUBFIELD_DELIMITER, $f);
             foreach ( $_sfs as $k=>$v) {
                 if ( $k != 0 ) $subfield[substr($v,0,1)] = $this->IsisDecode( substr($v, 1));
                 else {
-                    $subfield['i1'] = substr($v,0,1);
-                    $subfield['i2'] = substr($v,1,1);
+                    $subfield[self::RECORDEXTRACT_SUBFIELD_IND1] = substr($v,0,1);
+                    $subfield[self::RECORDEXTRACT_SUBFIELD_IND2] = substr($v,1,1);
                 }
             }
             return $subfield;
-        } else return $this->IsisDecode ($f);
+        } else return $this->IsisDecode ($f);        
     }
     
     /**
@@ -154,6 +241,7 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
      */
     private function __decode_letter( $l)
     {
+        //Mas eficiente que usar un Array, ocupa más codigo pero tiene ahorro en recursos cuando se trata analizas grandes cantidades de ISOS
         switch (ord($l)) {                                                         
             //A
             case 131: return 'â'; case 132: return 'ä'; case 142: return 'Ä';
