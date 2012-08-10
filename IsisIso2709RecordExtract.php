@@ -51,7 +51,8 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
      * @param boolean $block80 Dividido en lineas de 80 caracteres, por defecto Isis lo exporta asi.
      */
     public function __construct ( $data, $block80 = true) {        
-
+                                                    //El bloque de tipo 80Chars/Line sera convertido en una unica
+                                                    //linea por el carro de retorno extandar de ISIS \r\n
         if ( $block80) $this->data = trim(implode("", explode("\r\n", $data)));
                   else $this->data = trim($data);
                   
@@ -179,7 +180,7 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
                                     $this->array[$field[self::DIRECTORY_FIELD_LABEL]][$_R] = $_V;
                                 else 
                                     //Caso contrario le agrego el contenido del subcampo secundario
-                                    $this->array[$field[self::DIRECTORY_FIELD_LABEL]][$_R] .= self::ISIS_REPETIBLE . $_V;
+                                    $this->array[$field[self::DIRECTORY_FIELD_LABEL]][$_R] .= " " . self::ISIS_REPETIBLE . " " . $_V;
                 else
                     //Pudiera ocurrir el extrano caso de que el secundario si tuviera subcampo aunque el primero no, 
                     //algo realmente raro pero caso que ocurriera me quedo solo con el campo primario
@@ -211,7 +212,7 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
             $subfield = array();
             $_sfs = explode(self::ISIS_SUBFIELD_DELIMITER, $f);
             foreach ( $_sfs as $k=>$v) {
-                if ( $k != 0 ) $subfield[substr($v,0,1)] = $this->IsisDecode( substr($v, 1));
+                if ( $k != 0 ) $subfield[strtolower(substr($v,0,1))] = $this->IsisDecode( substr($v, 1));
                 else {
                     $subfield[self::RECORDEXTRACT_SUBFIELD_IND1] = substr($v,0,1);
                     $subfield[self::RECORDEXTRACT_SUBFIELD_IND2] = substr($v,1,1);
@@ -264,7 +265,8 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
             case 235: return 'Ù'; case 163: return 'ú'; case 129: return 'ü';                
             //RESTO    
             case 128: return 'Ç'; case 135: return 'ç'; case 164: return 'ñ';
-            case 165: return 'Ñ'; case 169: return '®'; case 194: return '¿';
+            case 165: return 'Ñ'; case 169: return '®'; case 194: return '?';    
+            case 173: return '¡'; case 168: return '¿';  
             //Def    
             default: return $l;
         }
@@ -289,7 +291,7 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
     }
 
     function current() {       
-        return $this[$this->it_fake_pos];
+        return $this[$this->key()];
     }
 
     function key() {        
@@ -297,15 +299,16 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
     }
 
     function next() {   
-        if ( $this->it_pos < count($this)-1 )
+        if ( $this->it_pos < count($this) )
         {
             ++$this->it_pos;
-            $this->it_fake_pos = $this->fields[$this->it_pos];
+            if ( $this->valid())
+                $this->it_fake_pos = $this->fields[$this->it_pos];
         }
     }
 
     function valid() {      
-        return ( $this->it_pos < count($this)-1 );
+        return ( $this->it_pos < count($this) );
     }
     
     /**
