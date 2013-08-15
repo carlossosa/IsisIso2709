@@ -9,8 +9,9 @@
  *          Foundation; either version 2 of the License, or (at your option) any later
  *          version.
  * @package IsisIso2709
+ * @version 0.2
  */
-class IsisIso2709Records implements ArrayAccess, Countable,  Iterator {
+class IsisIso2709Records implements \ArrayAccess, \Countable,  \Iterator {
     /**
      * RECORD_SEPARATOR : separador de registros en CDS/Isis 
      */
@@ -24,18 +25,18 @@ class IsisIso2709Records implements ArrayAccess, Countable,  Iterator {
      * Recurso con el Fichero abierto.
      * @var Resource 
      */
-    private $resource;
+    protected $resource;
     /**
      * Micro indice con las ubicaciones de los Registros en el Iso
      * @var type 
      */
-    private $directory;
+    protected $directory;
     
     /**
      * Iterartor contador
      * @var type 
      */
-    private $it_pos;
+    protected $it_pos;
     
     /**
      * 
@@ -47,9 +48,9 @@ class IsisIso2709Records implements ArrayAccess, Countable,  Iterator {
         {
           $this->resource = fopen($_path, 'r'); // Abro el archivo
           if ( !is_resource($this->resource))
-              throw new ErrorException('Error al abrir el archivo.');
+              throw new \ErrorException('Error al abrir el archivo.');
         } else            
-            throw new ErrorException('Error al intentar acceder al archivo.'); // Lanzada un Excepcion de acceso
+            throw new \ErrorException('Error al intentar acceder al archivo.'); // Lanzada un Excepcion de acceso
         
         // Incializo el Indice
         $this->directory = array();
@@ -62,7 +63,7 @@ class IsisIso2709Records implements ArrayAccess, Countable,  Iterator {
     /**
      * Crea el indice con las ubicaciones de los registros en el Iso 
      */
-    private function preScan ()
+    protected function preScan ()
     {
         $pos = 0;
         while ( !feof($this->resource))  
@@ -150,6 +151,6 @@ class IsisIso2709Records implements ArrayAccess, Countable,  Iterator {
             }
         }
         else 
-            throw new ErrorException('Campo no válido.');
+            throw new \ErrorException('Campo no válido.');
     }
 }

@@ -12,8 +12,9 @@
  *          Foundation; either version 2 of the License, or (at your option) any later
  *          version.
  * @package IsisIso2709
+ * @version 0.2
  */
-class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
+class IsisIso2709RecordExtract implements \ArrayAccess, \Countable,  \Iterator {
     /** Head Const */
     const Record_Length = 0;
     const Subfield_Identifier_Length = 1;
@@ -51,8 +52,7 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
      * @param boolean $block80 Dividido en lineas de 80 caracteres, por defecto Isis lo exporta asi.
      */
     public function __construct ( $data, $block80 = true) {        
-                                                    //El bloque de tipo 80Chars/Line sera convertido en una unica
-                                                    //linea por el carro de retorno extandar de ISIS \r\n
+
         if ( $block80) $this->data = trim(implode("", explode("\r\n", $data)));
                   else $this->data = trim($data);
                   
@@ -180,7 +180,7 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
                                     $this->array[$field[self::DIRECTORY_FIELD_LABEL]][$_R] = $_V;
                                 else 
                                     //Caso contrario le agrego el contenido del subcampo secundario
-                                    $this->array[$field[self::DIRECTORY_FIELD_LABEL]][$_R] .= " " . self::ISIS_REPETIBLE . " " . $_V;
+                                    $this->array[$field[self::DIRECTORY_FIELD_LABEL]][$_R] .= self::ISIS_REPETIBLE . $_V;
                 else
                     //Pudiera ocurrir el extrano caso de que el secundario si tuviera subcampo aunque el primero no, 
                     //algo realmente raro pero caso que ocurriera me quedo solo con el campo primario
@@ -207,19 +207,114 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
     private function __subFieldsExtract ( $f)
     {                
         //Detectar si es un subcampo buscando 
-        if ( preg_match( '/(^(\s|\d|\*)+\^|^\^)/', $f) )
+        //UPDATE: Mejora detectando campos con subcampos con problemas
+        //EJ : m *^a^b^c^d^f^t^x^y^z^2^3*
+        /*
+         * 
+           m *^a^b^c^d^f^t^x^y^z^2^3
+	   ,^aF.G.^b^c^d^e^f^g99-454^hC.Pa.
+           x**^a^d^e^f^h^i^v^x^z
+	   b**^a
+	   +**^a^b^c^d^e^f^g^h^3^4
+	   0-674-03307-8**^a^b^d^z
+	   b**^a^b
+	   **^aDirectorio Turístico de Cuba^b^c^d^e1996^f^g^...
+	   x**^a1 ej.^b61/99 BN^cBR^d^e^grústica^h^i^j^k^l^mP...
+	   x**^a^b^c^d^e^f^g^h^3^4
+	   m**^a84-7882-232-1
+	   x**^aColección de autores cubanos^e^d^e^f^h^iHisto...
+         */
+        /**
+         * 
+         $m = array();
+         preg_match_all('#\^(([a-zA-Z0-9])[^\^]+)#i',"x**^a1 ej.^b61/99 BN^cBR^d^e^grústica^h^i^j^k^l", $m);
+         var_dump($m);
+
+array(3) {
+  [0] =>
+  array(4) {
+    [0] =>
+    string(7) "^a1 ej."
+    [1] =>
+    string(10) "^b61/99 BN"
+    [2] =>
+    string(4) "^cBR"
+    [3] =>
+    string(10) "^grústica"
+  }
+  [1] =>
+  array(4) {
+    [0] =>
+    string(6) "a1 ej."
+    [1] =>
+    string(9) "b61/99 BN"
+    [2] =>
+    string(3) "cBR"
+    [3] =>
+    string(9) "grústica"
+  }
+  [2] =>
+  array(4) {
+    [0] =>
+    string(1) "a"
+    [1] =>
+    string(1) "b"
+    [2] =>
+    string(1) "c"
+    [3] =>
+    string(1) "g"
+  }
+}
+---
+array(2) {
+  [0] =>
+  array(4) {
+    [0] =>
+    string(7) "^a1 ej."
+    [1] =>
+    string(10) "^b61/99 BN"
+    [2] =>
+    string(4) "^cBR"
+    [3] =>
+    string(10) "^grústica"
+  }
+  [1] =>
+  array(4) {
+    [0] =>
+    string(6) "a1 ej."
+    [1] =>
+    string(9) "b61/99 BN"
+    [2] =>
+    string(3) "cBR"
+    [3] =>
+    string(9) "grústica"
+  }
+}
+
+         */
+        //if ( preg_match( '#(^(\s|\d|\*)+\^|^\^)#', $f) )
+        if (strpos($f, self::ISIS_SUBFIELD_DELIMITER) !== false )
         {    
+            $matchs = array();
+            
+            preg_match_all('#\^([a-zA-Z0-9][^\^]+)#i', $f, $matchs);
+            
+            if ( count($matchs) != 2) 
+                return null;
+            
             $subfield = array();
-            $_sfs = explode(self::ISIS_SUBFIELD_DELIMITER, $f);
-            foreach ( $_sfs as $k=>$v) {
-                if ( $k != 0 ) $subfield[strtolower(substr($v,0,1))] = $this->IsisDecode( substr($v, 1));
-                else {
-                    $subfield[self::RECORDEXTRACT_SUBFIELD_IND1] = substr($v,0,1);
-                    $subfield[self::RECORDEXTRACT_SUBFIELD_IND2] = substr($v,1,1);
-                }
+            
+            if ( strpos($f, self::ISIS_SUBFIELD_DELIMITER) == 1) {
+                $subfield[self::RECORDEXTRACT_SUBFIELD_IND1] = substr($f,0,1);
+                $subfield[self::RECORDEXTRACT_SUBFIELD_IND2] = substr($f,1,1);
+            }
+            
+            //$_sfs = explode(self::ISIS_SUBFIELD_DELIMITER, $f);
+            foreach ( $matchs[1] as $k=>$v) {
+                $subfield[strtolower(substr($v,0,1))] = $this->IsisDecode( trim(substr($v, 1)));                
             }
             return $subfield;
-        } else return $this->IsisDecode ($f);        
+        } else return $this->IsisDecode (trim($f));        
     }
     
     /**
@@ -241,7 +336,9 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
      * @return char 
      */
     private function __decode_letter( $l)
-    {
+    {        
+        if ( preg_match("#^[a-zA-Z0-9\^\[\]\{\}@_\'\#\$\%\&\*\(\)\~\`\"\+\=\:\.\?\<\>\/-]$#", $l ) )
+            return $l;
         //Mas eficiente que usar un Array, ocupa más codigo pero tiene ahorro en recursos cuando se trata analizas grandes cantidades de ISOS
         switch (ord($l)) {                                                         
             //A
@@ -265,10 +362,11 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
             case 235: return 'Ù'; case 163: return 'ú'; case 129: return 'ü';                
             //RESTO    
             case 128: return 'Ç'; case 135: return 'ç'; case 164: return 'ñ';
-            case 165: return 'Ñ'; case 169: return '®'; case 194: return '?';    
-            case 173: return '¡'; case 168: return '¿';  
+            case 165: return 'Ñ'; case 169: return '®'; case 194: return '¿';    
+	    case 173: return '¡'; case 168: return '¿';  
             //Def    
-            default: return $l;
+            default:                 
+                return ' ';
         }
     }
     
@@ -301,7 +399,7 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
     function next() {   
         if ( $this->it_pos < count($this) )
         {
-            ++$this->it_pos;
+ 	    ++$this->it_pos;
             if ( $this->valid())
                 $this->it_fake_pos = $this->fields[$this->it_pos];
         }
@@ -331,5 +429,5 @@ class IsisIso2709RecordExtract implements ArrayAccess, Countable,  Iterator {
             return $this->array[$offset];
         else 
             throw new ErrorException('Campo no válido.');
-    }        
+    }            
 }
