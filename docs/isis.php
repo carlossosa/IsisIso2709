@@ -56,7 +56,7 @@ class IsisXml {
                 echo "Error al intentar abrir el archivo.";
             }
         } else
-            throw new ErrorException('No se ha definido ningun archivo para abrir.');
+            throw new ErrorException('No se ha definido ningÃ‚Â£n archivo para abrir.');
     }
 
     public function getRegistro()
@@ -109,7 +109,7 @@ $var = <<<EOF
 <field tag="200" i1="1" i2=" ">
 <subfield code="a">Objetos perdidos</subfield>
 <subfield code="e">antologÂ¡a de cuentos</subfield>
-<subfield code="f">JosÂ JimÂnez Lozano</subfield>
+<subfield code="f">Josï¿½ Jimï¿½nez Lozano</subfield>
 <subfield code="g">introd. y sel. Francisco Javier Higuero</subfield>
 </field>
 <field tag="205" i1=" " i2=" ">
@@ -196,8 +196,8 @@ $var = <<<EOF
 <subfield code="z">spa</subfield>
 </field>
 <field tag="700" i1=" " i2="1">
-<subfield code="a">JimÂnez Lozano</subfield>
-<subfield code="b">JosÂ</subfield>
+<subfield code="a">Jimï¿½nez Lozano</subfield>
+<subfield code="b">Josï¿½</subfield>
 <subfield code="f">1930-</subfield>
 </field>
 <field tag="701" i1=" " i2="1">
